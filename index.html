@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>전자기 유도 가상 실험실 (수행평가용)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 1);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e2e8f0;
+        }
+
+        #simulation-container {
+            width: 100%;
+            height: 400px;
+            position: relative;
+            background: #ffffff;
+            border-radius: 0.5rem;
+            border: 1px solid #cbd5e1;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+        }
+
+        .meter-needle {
+            transform-origin: bottom center;
+            transition: transform 0.02s ease-out, background-color 0.1s;
+        }
+
+        /* Segmented Control Styles */
+        .segmented-control {
+            display: flex;
+            background-color: #f1f5f9;
+            padding: 0.25rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .segmented-control label {
+            flex: 1;
+            text-align: center;
+            padding: 0.5rem 0;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #64748b;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+
+        .segmented-control input[type="radio"] {
+            display: none;
+        }
+
+        .segmented-control input[type="radio"]:checked + label {
+            background-color: #ffffff;
+            color: #0f172a;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .btn-run {
+            background-color: #2563eb;
+            color: white;
+            transition: all 0.2s;
+        }
+        .btn-run:hover { background-color: #1d4ed8; }
+        .btn-run:active { transform: scale(0.98); }
+        .btn-run:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6 lg:p-8">
+
+    <header class="max-w-6xl mx-auto w-full mb-6 flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                <i class="fa-solid fa-microscope text-blue-600"></i> 전자기 유도 실험
+            </h1>
+            <p class="text-slate-500 font-medium mt-1">변인을 조작하여 발생하는 전류의 크기와 방향을 관찰하고 기록하세요.</p>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left: Variables Control Panel -->
+        <section class="lg:col-span-1 flex flex-col gap-6">
+            <div class="glass-panel p-5">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2">조작 변인 설정</h2>
+                
+                <div class="flex flex-col gap-5">
+                    <!-- Variable 1: Magnet Pole -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">1. 자석의 극 (코일을 향하는 방향)</label>
+                        <div class="segmented-control">
+                            <input type="radio" id="pole-n" name="magnet-pole" value="N" checked onchange="updateSettings()">
+                            <label for="pole-n" class="flex items-center justify-center gap-2">
+                                <span class="w-3 h-3 rounded-full bg-red-500"></span> N극 방향
+                            </label>
+                            
+                            <input type="radio" id="pole-s" name="magnet-pole" value="S" onchange="updateSettings()">
+                            <label for="pole-s" class="flex items-center justify-center gap-2">
+                                <span class="w-3 h-3 rounded-full bg-blue-500"></span> S극 방향
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Variable 2: Number of Magnets -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">2. 자석의 갯수</label>
+                        <div class="segmented-control">
+                            <input type="radio" id="mag-1" name="magnet-count" value="1" checked onchange="updateSettings()">
+                            <label for="mag-1">1 개</label>
+                            
+                            <input type="radio" id="mag-2" name="magnet-count" value="2" onchange="updateSettings()">
+                            <label for="mag-2">2 개</label>
+
+                            <input type="radio" id="mag-3" name="magnet-count" value="3" onchange="updateSettings()">
+                            <label for="mag-3">3 개</label>
+                        </div>
+                    </div>
+
+                    <!-- Variable 3: Coil Turns -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">3. 코일의 감은 수</label>
+                        <div class="segmented-control">
+                            <input type="radio" id="turn-100" name="coil-turns" value="100" checked onchange="updateSettings()">
+                            <label for="turn-100">100 번</label>
+                            
+                            <input type="radio" id="turn-200" name="coil-turns" value="200" onchange="updateSettings()">
+                            <label for="turn-200">200 번</label>
+
+                            <input type="radio" id="turn-300" name="coil-turns" value="300" onchange="updateSettings()">
+                            <label for="turn-300">300 번</label>
+                        </div>
+                    </div>
+
+                    <!-- Variable 4: Magnet Speed -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">4. 자석의 이동 속력</label>
+                        <div class="segmented-control">
+                            <input type="radio" id="speed-slow" name="magnet-speed" value="3" onchange="updateSettings()">
+                            <label for="speed-slow">느리게</label>
+                            
+                            <input type="radio" id="speed-normal" name="magnet-speed" value="6" checked onchange="updateSettings()">
+                            <label for="speed-normal">보통</label>
+
+                            <input type="radio" id="speed-fast" name="magnet-speed" value="12" onchange="updateSettings()">
+                            <label for="speed-fast">빠르게</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-8 flex gap-3">
+                    <button id="btn-pass-magnet" onclick="runExperiment()" class="btn-run flex-1 py-3 rounded-lg font-bold text-lg shadow-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i> 통과시키기
+                    </button>
+                    <!-- 일시정지 버튼 추가 -->
+                    <button id="btn-pause-magnet" onclick="togglePause()" class="flex-1 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold text-lg shadow-sm flex items-center justify-center gap-2 transition-colors hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i class="fa-solid fa-pause"></i> 일시정지
+                    </button>
+                </div>
+                <p class="text-xs text-center text-slate-400 mt-2">※ 이동 중 일시정지하여 정지 상태의 전류 변화를 관찰할 수 있습니다.</p>
+            </div>
+
+            <!-- Data Output Readout -->
+            <div class="glass-panel p-5 bg-slate-800 text-white">
+                <h2 class="text-sm font-bold text-slate-300 mb-3 uppercase tracking-wider">관측 데이터 (Digital Ammeter)</h2>
+                
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                        <div class="text-xs text-slate-400 mb-1">실시간 전류</div>
+                        <div class="font-mono text-3xl font-black flex items-center gap-1" id="digital-current">
+                            <i class="fa-solid fa-minus text-slate-600 text-2xl mr-1"></i><span class="text-slate-400">0.0</span> <span class="text-sm font-bold text-slate-500 ml-1">mA</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-900 rounded-lg p-4 border border-slate-700 relative">
+                        <div class="text-xs text-slate-400 mb-1">측정된 최대 전류 (절댓값)</div>
+                        <div class="font-mono text-2xl font-bold text-amber-400 flex items-baseline gap-1" id="peak-current">
+                            0.0 <span class="text-sm font-bold text-slate-500">mA</span>
+                        </div>
+                        <button onclick="resetPeak()" class="absolute top-4 right-4 text-xs text-slate-500 hover:text-white transition-colors">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right: Simulation Canvas -->
+        <section class="lg:col-span-2 flex flex-col gap-4">
+            <div class="glass-panel p-4 h-full flex flex-col relative">
+                <h2 class="text-sm font-bold text-slate-500 mb-2 pl-2">실험 장치 화면</h2>
+                
+                <!-- Canvas Container -->
+                <div id="simulation-container" class="flex-1 bg-slate-50">
+                    <canvas id="simCanvas"></canvas>
+                    
+                    <!-- Analog Ammeter Overlay -->
+                    <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex flex-col items-center pointer-events-none">
+                        <div class="bg-white p-3 rounded-t-full shadow-lg border-2 border-slate-300 w-48 relative overflow-hidden flex flex-col justify-end h-24">
+                            <!-- Meter Dial Background -->
+                            <div class="absolute top-0 left-0 w-full h-full bg-slate-50 rounded-t-full"></div>
+                            
+                            <!-- Scale markings -->
+                            <div class="absolute bottom-0 left-1/2 w-0 h-0">
+                                <div class="absolute bottom-1 w-[2px] h-4 bg-slate-800 transform -translate-x-1/2"></div>
+                                <div class="absolute bottom-1 w-[2px] h-3 bg-blue-300 transform origin-bottom -translate-x-1/2 -rotate-[30deg] -translate-y-[8px]"></div>
+                                <div class="absolute bottom-1 w-[2px] h-3 bg-blue-400 transform origin-bottom -translate-x-1/2 -rotate-[60deg] -translate-y-[4px]"></div>
+                                <div class="absolute bottom-1 w-[2px] h-4 bg-blue-500 transform origin-bottom -translate-x-1/2 -rotate-[90deg] -translate-y-[2px]"></div>
+                                <div class="absolute bottom-1 w-[2px] h-3 bg-rose-300 transform origin-bottom -translate-x-1/2 rotate-[30deg] -translate-y-[8px]"></div>
+                                <div class="absolute bottom-1 w-[2px] h-3 bg-rose-400 transform origin-bottom -translate-x-1/2 rotate-[60deg] -translate-y-[4px]"></div>
+                                <div class="absolute bottom-1 w-[2px] h-4 bg-rose-500 transform origin-bottom -translate-x-1/2 rotate-[90deg] -translate-y-[2px]"></div>
+                            </div>
+
+                            <!-- Needle -->
+                            <div id="analog-needle" class="meter-needle absolute bottom-1 left-1/2 w-[3px] h-20 bg-slate-400 rounded-t-full -ml-[1.5px] z-10"></div>
+                            
+                            <!-- Center Pin -->
+                            <div class="absolute bottom-[-6px] left-1/2 w-5 h-5 bg-slate-800 rounded-full -ml-[10px] z-20 border-2 border-white shadow-sm"></div>
+                            
+                            <!-- Labels -->
+                            <div class="absolute bottom-1 w-full flex justify-between px-4 text-[13px] font-black z-0">
+                                <span class="text-blue-500">-</span>
+                                <span class="text-slate-400">0</span>
+                                <span class="text-rose-500">+</span>
+                            </div>
+                            <div class="absolute top-2 w-full text-center text-[10px] font-bold text-slate-400">mA</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- State Management ---
+        const state = {
+            pole: 'N',
+            magnetCount: 1,
+            coilTurns: 100,
+            magnetSpeed: 6,
+            
+            // Animation and Physics Variables
+            magnetX: -300,
+            magnetVelocity: 0,
+            isMoving: false,
+            isPaused: false, // 일시정지 상태 추가
+            
+            // Current Readings
+            currentI: 0,
+            peakI: 0,
+            
+            // Visual Particles (Electrons)
+            particleOffset: 0
+        };
+
+        const Constants = {
+            COIL_WIDTH: 120,
+            COIL_RADIUS: 50,
+            MAGNET_BASE_WIDTH: 50,
+            MAGNET_HEIGHT: 36
+        };
+
+        // UI Elements
+        const btnPass = document.getElementById('btn-pass-magnet');
+        const btnPause = document.getElementById('btn-pause-magnet'); // 일시정지 버튼
+        const displayCurrent = document.getElementById('digital-current');
+        const displayPeak = document.getElementById('peak-current');
+        const needle = document.getElementById('analog-needle');
+        
+        // Canvas Setup
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height, cx, cy;
+
+        function resizeCanvas() {
+            const container = document.getElementById('simulation-container');
+            width = container.clientWidth;
+            height = container.clientHeight;
+            canvas.width = width * window.devicePixelRatio;
+            canvas.height = height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            cx = width / 2;
+            cy = height / 2 - 40;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Interaction Logic ---
+        function updateSettings() {
+            if (state.isMoving) return;
+
+            const poleInputs = document.getElementsByName('magnet-pole');
+            for (let input of poleInputs) if (input.checked) state.pole = input.value;
+
+            const countInputs = document.getElementsByName('magnet-count');
+            for (let input of countInputs) if (input.checked) state.magnetCount = parseInt(input.value);
+
+            const turnInputs = document.getElementsByName('coil-turns');
+            for (let input of turnInputs) if (input.checked) state.coilTurns = parseInt(input.value);
+
+            const speedInputs = document.getElementsByName('magnet-speed');
+            for (let input of speedInputs) if (input.checked) state.magnetSpeed = parseInt(input.value);
+
+            state.magnetX = - (cx + (state.magnetCount * Constants.MAGNET_BASE_WIDTH) / 2 + 50);
+            
+            state.currentI = 0;
+            updateReadouts();
+        }
+
+        function resetPeak() {
+            state.peakI = 0;
+            displayPeak.innerHTML = `0.0 <span class="text-sm font-bold text-slate-500">mA</span>`;
+        }
+
+        function runExperiment() {
+            if (state.isMoving && !state.isPaused) return;
+            
+            state.magnetX = - (cx + (state.magnetCount * Constants.MAGNET_BASE_WIDTH) / 2 + 50);
+            state.magnetVelocity = state.magnetSpeed;
+            state.isMoving = true;
+            state.isPaused = false;
+            state.currentI = 0;
+            
+            btnPass.disabled = true;
+            btnPass.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 진행 중...';
+            
+            // 일시정지 버튼 활성화 및 초기화
+            btnPause.disabled = false;
+            btnPause.innerHTML = '<i class="fa-solid fa-pause"></i> 일시정지';
+            btnPause.className = "flex-1 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold text-lg shadow-sm flex items-center justify-center gap-2 transition-colors hover:bg-slate-300";
+
+            resetPeak();
+        }
+
+        // 일시정지/재생 토글 함수
+        function togglePause() {
+            if (!state.isMoving) return;
+
+            state.isPaused = !state.isPaused;
+
+            if (state.isPaused) {
+                state.magnetVelocity = 0; // 속도를 0으로 만들어 유도 기전력 발생 중지
+                btnPause.innerHTML = '<i class="fa-solid fa-play"></i> 계속 이동';
+                btnPause.classList.replace('bg-slate-200', 'bg-amber-400');
+                btnPause.classList.replace('hover:bg-slate-300', 'hover:bg-amber-500');
+                btnPause.classList.replace('text-slate-700', 'text-amber-900');
+            } else {
+                state.magnetVelocity = state.magnetSpeed; // 원래 속도 복구
+                btnPause.innerHTML = '<i class="fa-solid fa-pause"></i> 일시정지';
+                btnPause.classList.replace('bg-amber-400', 'bg-slate-200');
+                btnPause.classList.replace('hover:bg-amber-500', 'hover:bg-slate-300');
+                btnPause.classList.replace('text-amber-900', 'text-slate-700');
+            }
+        }
+
+        // --- Physics and Math ---
+        function updatePhysics() {
+            if (!state.isMoving) {
+                state.currentI += (0 - state.currentI) * 0.1;
+                return;
+            }
+
+            // 일시정지 상태가 아닐 때만 위치 이동
+            if (!state.isPaused) {
+                state.magnetX += state.magnetVelocity;
+            }
+
+            const sigma = 75; 
+            let B = state.magnetCount * 2.0; 
+            if (state.pole === 'S') { B = -B; }
+
+            const x = state.magnetX;
+            const expFactor = Math.exp(-(x * x) / (2 * sigma * sigma));
+            const dPhi_dx = B * (-x / (sigma * sigma)) * expFactor;
+            
+            // 핵심: 정지 상태면 magnetVelocity가 0이므로 dPhi_dt도 0이 됨
+            const dPhi_dt = dPhi_dx * state.magnetVelocity;
+
+            const scaledN = state.coilTurns / 100; 
+            let emf = - scaledN * dPhi_dt;
+
+            let calculatedI = emf * 60; 
+
+            // 부드러운 바늘 이동 처리 (정지 시 전류가 0으로 급격히 수렴)
+            state.currentI += (calculatedI - state.currentI) * 0.5;
+
+            if (Math.abs(state.currentI) > state.peakI) {
+                state.peakI = Math.abs(state.currentI);
+            }
+
+            // 통과 완료 시 처리
+            if (state.magnetX > cx + (state.magnetCount * Constants.MAGNET_BASE_WIDTH) / 2 + 50) {
+                state.isMoving = false;
+                state.isPaused = false;
+                state.magnetVelocity = 0;
+                
+                btnPass.disabled = false;
+                btnPass.innerHTML = '<i class="fa-solid fa-play"></i> 통과시키기';
+                
+                btnPause.disabled = true;
+                btnPause.innerHTML = '<i class="fa-solid fa-pause"></i> 일시정지';
+                btnPause.className = "flex-1 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold text-lg shadow-sm flex items-center justify-center gap-2 transition-colors hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed";
+            }
+        }
+
+        // --- Canvas Rendering (기존과 동일) ---
+        function updateReadouts() {
+            const val = Math.abs(state.currentI).toFixed(1);
+            let colorClass = 'text-slate-400';
+            let iconHtml = '<i class="fa-solid fa-minus text-slate-600 text-2xl mr-1"></i>';
+            
+            const needle = document.getElementById('analog-needle');
+            
+            if (state.currentI > 0.5) {
+                colorClass = 'text-rose-500';
+                iconHtml = '<i class="fa-solid fa-caret-right text-rose-500 text-2xl mr-1"></i>';
+                needle.style.backgroundColor = '#f43f5e';
+            } else if (state.currentI < -0.5) {
+                colorClass = 'text-blue-500';
+                iconHtml = '<i class="fa-solid fa-caret-left text-blue-500 text-2xl mr-1"></i>';
+                needle.style.backgroundColor = '#3b82f6';
+            } else {
+                needle.style.backgroundColor = '#94a3b8';
+            }
+
+            displayCurrent.innerHTML = `${iconHtml}<span class="${colorClass}">${val}</span> <span class="text-sm font-bold text-slate-500 ml-1">mA</span>`;
+            displayPeak.innerHTML = `${state.peakI.toFixed(1)} <span class="text-sm font-bold text-slate-500">mA</span>`;
+
+            const maxVisualI = 95;
+            let angle = (state.currentI / maxVisualI) * 90;
+            angle = Math.max(-90, Math.min(90, angle));
+            needle.style.transform = `rotate(${angle}deg)`;
+
+            if (Math.abs(state.currentI) > 0.5) {
+                state.particleOffset += state.currentI * 0.02;
+            }
+        }
+
+        function drawWiring() {
+            ctx.save();
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 6;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+
+            const startX = cx - Constants.COIL_WIDTH/2;
+            const endX = cx + Constants.COIL_WIDTH/2;
+            
+            const path = new Path2D();
+            path.moveTo(startX, cy + Constants.COIL_RADIUS - 5);
+            path.lineTo(startX, cy + Constants.COIL_RADIUS + 80);
+            path.lineTo(cx - 60, cy + Constants.COIL_RADIUS + 80);
+            path.lineTo(cx - 60, cy + Constants.COIL_RADIUS + 120);
+
+            path.moveTo(endX, cy - Constants.COIL_RADIUS + 5);
+            path.lineTo(endX + 30, cy - Constants.COIL_RADIUS + 5);
+            path.lineTo(endX + 30, cy + Constants.COIL_RADIUS + 80);
+            path.lineTo(cx + 60, cy + Constants.COIL_RADIUS + 80);
+            path.lineTo(cx + 60, cy + Constants.COIL_RADIUS + 120);
+
+            ctx.stroke(path);
+
+            if (Math.abs(state.currentI) > 0.5) {
+                ctx.save();
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([4, 16]);
+                ctx.lineDashOffset = -state.particleOffset;
+                ctx.stroke(path);
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        function drawCoilBack() {
+            ctx.save();
+            ctx.strokeStyle = '#94a3b8';
+            
+            let visualTurns = 10;
+            if (state.coilTurns === 200) visualTurns = 18;
+            if (state.coilTurns === 300) visualTurns = 26;
+            
+            ctx.lineWidth = state.coilTurns === 300 ? 3 : (state.coilTurns === 200 ? 4 : 5);
+            ctx.lineCap = 'round';
+            
+            const spacing = Constants.COIL_WIDTH / visualTurns;
+            const startX = cx - Constants.COIL_WIDTH/2;
+
+            for(let i=0; i<=visualTurns; i++) {
+                const x = startX + i * spacing;
+                ctx.beginPath();
+                ctx.ellipse(x, cy, 18, Constants.COIL_RADIUS, 0, Math.PI/2, 3*Math.PI/2);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawCoilFront() {
+            ctx.save();
+            ctx.strokeStyle = '#f59e0b';
+            
+            let visualTurns = 10;
+            if (state.coilTurns === 200) visualTurns = 18;
+            if (state.coilTurns === 300) visualTurns = 26;
+            
+            ctx.lineWidth = state.coilTurns === 300 ? 3 : (state.coilTurns === 200 ? 4 : 5);
+            ctx.lineCap = 'round';
+            
+            const spacing = Constants.COIL_WIDTH / visualTurns;
+            const startX = cx - Constants.COIL_WIDTH/2;
+
+            for(let i=0; i<=visualTurns; i++) {
+                const x = startX + i * spacing;
+                ctx.beginPath();
+                ctx.ellipse(x, cy, 18, Constants.COIL_RADIUS, 0, -Math.PI/2, Math.PI/2);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function drawMagnet() {
+            const magW = state.magnetCount * Constants.MAGNET_BASE_WIDTH;
+            const magH = Constants.MAGNET_HEIGHT;
+            const magX = cx + state.magnetX;
+            const magY = cy;
+
+            ctx.save();
+            ctx.translate(magX, magY);
+
+            ctx.shadowColor = 'rgba(0,0,0,0.3)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetY = 4;
+
+            let leftColor = state.pole === 'N' ? '#3b82f6' : '#ef4444';
+            let rightColor = state.pole === 'N' ? '#ef4444' : '#3b82f6';
+            let leftLabel = state.pole === 'N' ? 'S' : 'N';
+            let rightLabel = state.pole === 'N' ? 'N' : 'S';
+
+            ctx.fillStyle = leftColor;
+            ctx.beginPath();
+            ctx.roundRect(-magW/2, -magH/2, magW/2, magH, [4, 0, 0, 4]);
+            ctx.fill();
+
+            ctx.fillStyle = rightColor;
+            ctx.beginPath();
+            ctx.roundRect(0, -magH/2, magW/2, magH, [0, 4, 4, 0]);
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 2;
+            for(let i=1; i<state.magnetCount; i++) {
+                const divX = -magW/2 + i * Constants.MAGNET_BASE_WIDTH;
+                ctx.beginPath();
+                ctx.moveTo(divX, -magH/2);
+                ctx.lineTo(divX, magH/2);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(leftLabel, -magW/2 + 15, 0);
+            ctx.fillText(rightLabel, magW/2 - 15, 0);
+
+            ctx.restore();
+        }
+
+        function renderLoop() {
+            updatePhysics();
+            updateReadouts();
+
+            ctx.clearRect(0, 0, width, height);
+
+            drawWiring();
+            drawCoilBack();
+            drawMagnet();
+            drawCoilFront();
+
+            requestAnimationFrame(renderLoop);
+        }
+
+        // --- Initialization ---
+        window.onload = () => {
+            resizeCanvas();
+            updateSettings();
+            renderLoop();
+        };
+
+    </script>
+</body>
+</html>
